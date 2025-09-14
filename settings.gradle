@@ -1,17 +1,11 @@
-// Root build.gradle (safe default)
-buildscript {
-    repositories {
-        google()
-        mavenCentral()
-    }
-    dependencies {
-        classpath "com.android.tools.build:gradle:8.0.2"
-    }
-}
+// settings.gradle
 
-allprojects {
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
+rootProject.name = "ApkBuilder"
+
+// Modul utama
+include(":app")
+
+// Kalau nanti kamu mau tambah modul:
+// include(":core")
+// include(":server")
+// include(":ui")
