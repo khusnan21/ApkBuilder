@@ -3,39 +3,30 @@ plugins {
 }
 
 android {
-    namespace 'com.nkjayanet.app'
     compileSdk 33
+    namespace 'com.nkjayanet.app'
 
     defaultConfig {
         applicationId "com.nkjayanet.app"
-        minSdk 24
+        minSdk 21
         targetSdk 33
         versionCode 1
         versionName "1.0"
-
-        // Aktifkan multiDex kalau asset banyak
-        multiDexEnabled true
     }
 
     buildTypes {
+        debug {
+            minifyEnabled false
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
-
-    sourceSets {
-        main {
-            assets.srcDirs = ['src/main/assets']
-            java.srcDirs = ['src/main/java']
-            res.srcDirs = ['src/main/res']
-            manifest.srcFile 'src/main/AndroidManifest.xml'
-        }
-    }
 }
 
 dependencies {
-    implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'androidx.core:core:1.12.0'
-    implementation 'androidx.multidex:multidex:2.0.1'
+    implementation "androidx.appcompat:appcompat:1.6.1"
+    implementation "com.google.android.material:material:1.11.0"
+    testImplementation "junit:junit:4.13.2"
 }
