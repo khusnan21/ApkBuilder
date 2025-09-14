@@ -1,57 +1,26 @@
-plugins {
-    id 'com.android.application'
+# Keep WebView interface
+-keepclassmembers class com.nkjayanet.app.WebAppInterface {
+    public *;
 }
 
-android {
-    namespace 'com.nkjayanet.app'
-    compileSdk 33
-
-    defaultConfig {
-        applicationId "com.nkjayanet.app"
-        minSdk 21
-        targetSdk 33
-        versionCode 1
-        versionName "1.0"
-
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-    }
-
-    buildTypes {
-        debug {
-            minifyEnabled false
-            shrinkResources false
-        }
-        release {
-            minifyEnabled true
-            shrinkResources true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-        }
-    }
-
-    buildFeatures {
-        viewBinding true
-    }
-
-    packagingOptions {
-        exclude 'META-INF/LICENSE.txt'
-        exclude 'META-INF/NOTICE.txt'
-    }
+# Keep MainActivity
+-keep class com.nkjayanet.app.MainActivity {
+    public *;
 }
 
-dependencies {
-    // Core AndroidX
-    implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'com.google.android.material:material:1.11.0'
-    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
-
-    // WebView asset loader (optional)
-    implementation 'androidx.webkit:webkit:1.9.0'
-
-    // Local JARs (for embedded server logic, if any)
-    implementation fileTree(dir: 'libs', include: ['*.jar'])
-
-    // Testing
-    testImplementation 'junit:junit:4.13.2'
-    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+# Keep all app classes
+-keep class com.nkjayanet.app.** {
+    *;
 }
+
+# Keep asset loader and native bridge
+-keep class com.nkjayanet.app.util.** {
+    *;
+}
+-keep class com.nkjayanet.app.nativebridge.** {
+    *;
+}
+
+# Debugging support
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
