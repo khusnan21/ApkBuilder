@@ -2,10 +2,15 @@ package com.nkjayanet.app;
 
 import android.os.Bundle;
 import android.os.Handler;
+import android.view.View;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceError;
+import android.webkit.WebChromeClient;
+import android.webkit.ConsoleMessage;
+import android.widget.ProgressBar;
+import android.widget.TextView;
 import android.widget.Toast;
 import android.util.Log;
 import androidx.appcompat.app.AppCompatActivity;
@@ -14,12 +19,17 @@ import java.io.*;
 public class MainActivity extends AppCompatActivity {
 
     WebView webView;
+    ProgressBar loadingBar;
+    TextView logView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
         webView = findViewById(R.id.webView);
+        loadingBar = findViewById(R.id.loadingBar);
+        logView = findViewById(R.id.logView);
 
         webView.getSettings().setJavaScriptEnabled(true);
         webView.getSettings().setDomStorageEnabled(true);
@@ -28,6 +38,15 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onReceivedError(WebView view, WebResourceRequest req, WebResourceError err) {
                 Toast.makeText(MainActivity.this, "WebView error: " + err.getDescription(), Toast.LENGTH_LONG).show();
+                appendLog("WebView error: " + err.getDescription());
+                loadingBar.setVisibility(View.GONE);
+            }
+        });
+
+        webView.setWebChromeClient(new WebChromeClient() {
+            public boolean onConsoleMessage(ConsoleMessage msg) {
+                appendLog("WebView console: " + msg.message());
+                return true;
             }
         });
 
@@ -37,13 +56,16 @@ public class MainActivity extends AppCompatActivity {
         copyAssets("conf", new File(getFilesDir(), "conf"));
         copyAssets("scripts", new File(getFilesDir(), "scripts"));
 
-        // Start server based on config
+        // Start server
         startServerFromConfig();
 
         // Delay before loading WebView
+        loadingBar.setVisibility(View.VISIBLE);
         new Handler().postDelayed(() -> {
             webView.loadUrl("http://127.0.0.1:8080/");
-        }, 2000);
+            appendLog("WebView loading: http://127.0.0.1:8080/");
+            loadingBar.setVisibility(View.GONE);
+        }, 4000); // delay 4 detik
     }
 
     private void startServerFromConfig() {
@@ -56,7 +78,7 @@ public class MainActivity extends AppCompatActivity {
                 mode = line.trim();
             }
         } catch (IOException e) {
-            Log.e("CONFIG", "Failed to read server_mode.txt, defaulting to PHP");
+            appendLog("Config error: server_mode.txt not found, defaulting to PHP");
         }
 
         if (mode.equals("lighttpd")) {
@@ -69,8 +91,14 @@ public class MainActivity extends AppCompatActivity {
     private void startPhpServer() {
         try {
             File php = new File(getFilesDir(), "bin/php");
-            php.setExecutable(true);
+            if (!php.setExecutable(true)) {
+                Toast.makeText(this, "PHP binary not executable", Toast.LENGTH_LONG).show();
+                appendLog("PHP binary not executable");
+                return;
+            }
+
             File htdocs = new File(getFilesDir(), "htdocs");
+            appendLog("Starting PHP server...");
 
             Process p = Runtime.getRuntime().exec(new String[]{
                 php.getAbsolutePath(),
@@ -81,6 +109,8 @@ public class MainActivity extends AppCompatActivity {
             logProcess(p);
 
         } catch (IOException e) {
+            Toast.makeText(this, "PHP server failed to start", Toast.LENGTH_LONG).show();
+            appendLog("PHP server failed to start: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -89,7 +119,13 @@ public class MainActivity extends AppCompatActivity {
         try {
             File lighttpd = new File(getFilesDir(), "bin/lighttpd");
             File conf = new File(getFilesDir(), "conf/lighttpd.conf");
-            lighttpd.setExecutable(true);
+            if (!lighttpd.setExecutable(true)) {
+                Toast.makeText(this, "Lighttpd binary not executable", Toast.LENGTH_LONG).show();
+                appendLog("Lighttpd binary not executable");
+                return;
+            }
+
+            appendLog("Starting Lighttpd server...");
 
             Process p = Runtime.getRuntime().exec(new String[]{
                 lighttpd.getAbsolutePath(),
@@ -99,6 +135,8 @@ public class MainActivity extends AppCompatActivity {
             logProcess(p);
 
         } catch (IOException e) {
+            Toast.makeText(this, "Lighttpd failed to start", Toast.LENGTH_LONG).show();
+            appendLog("Lighttpd failed to start: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -111,10 +149,10 @@ public class MainActivity extends AppCompatActivity {
             try {
                 String line;
                 while ((line = stdout.readLine()) != null) {
-                    Log.d("SERVER-OUT", line);
+                    appendLog("SERVER-OUT: " + line);
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                appendLog("Log stdout error: " + e.getMessage());
             }
         }).start();
 
@@ -122,12 +160,19 @@ public class MainActivity extends AppCompatActivity {
             try {
                 String line;
                 while ((line = stderr.readLine()) != null) {
-                    Log.e("SERVER-ERR", line);
+                    appendLog("SERVER-ERR: " + line);
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                appendLog("Log stderr error: " + e.getMessage());
             }
         }).start();
+    }
+
+    private void appendLog(String msg) {
+        runOnUiThread(() -> {
+            logView.append(msg + "\n");
+            logView.post(() -> logView.scrollTo(0, logView.getBottom()));
+        });
     }
 
     private void copyAssets(String srcDir, File dstDir) {
@@ -158,7 +203,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            appendLog("Asset copy error: " + e.getMessage());
         }
     }
 }
