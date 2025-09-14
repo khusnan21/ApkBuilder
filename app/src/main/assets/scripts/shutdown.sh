@@ -1,16 +1,15 @@
 #!/system/bin/sh
 
-# 1. Base directory = parent folder dari scripts
-BASE="$(dirname "$0")/.."
-BIN="$BASE/bin"
-BUSYBOX="$BIN/busybox"
+APP_DIR="/data/data/com.nkjayanet.app/files"
+SOCKET="$APP_DIR/php.socket"
 
-# 2. Hentikan PHP FastCGI & Lighttpd
-#   - SIGTERM mengizinkan proses cleanup sebelum mati
-"$BUSYBOX" killall -SIGTERM php-cgi   2>/dev/null
-"$BUSYBOX" killall -SIGTERM lighttpd 2>/dev/null
+# Kill php-cgi
+pkill -f php-cgi
+echo "[shutdown.sh] php-cgi stopped"
 
-# 3. (Opsional) Bersihkan tmp socket/logs
-rm -rf "$BASE/tmp"/* 2>/dev/null
+# Kill lighttpd
+pkill -f lighttpd
+echo "[shutdown.sh] lighttpd stopped"
 
-exit 0
+# Cleanup socket
+[ -e "$SOCKET" ] && rm -f "$SOCKET"
