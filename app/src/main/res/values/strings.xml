@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">NK Jaya Net</string>
+    <string name="notification_text">Server aktif di 127.0.0.1:8080</string>
+</resources>

@@ -1,0 +1,26 @@
+#!/system/bin/sh
+
+export app="/data/data/org.opendroidphp"
+export sbin="${app}/components"
+export assets="/sdcard/droidphp"
+export busybox="$sbin/busybox/sbin/busybox"
+
+export name=$1
+export port=$2
+export location=$3
+
+nginx_conf_file="$assets/hosts/nginx/nginx_vhost_$name.conf"
+lighttpd_conf_file="$assets/hosts/lighttpd/lighttpd_vhost_$name.conf"
+
+$busybox cp $app/scripts/nginx_vhost.template $nginx_conf_file
+$busybox cp $app/scripts/lighttpd_vhost.template $lighttpd_conf_file
+
+## nginx
+$busybox sed -i "s{%PORT%{$port{" $nginx_conf_file
+$busybox sed -i "s{%LOCATION%{$location{" $nginx_conf_file
+
+## lighttpd
+$busybox sed -i "s{%PORT%{$port{" $lighttpd_conf_file
+$busybox sed -i "s{%LOCATION%{$location{" $lighttpd_conf_file
+
+echo 1

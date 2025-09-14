@@ -1,0 +1,16 @@
+#!/system/bin/sh
+
+export app="/data/data/org.opendroidphp"
+export sbin="${app}/components"
+export assets="/sdcard/droidphp"
+export busybox="$sbin/busybox/sbin/busybox"
+
+$busybox killall -SIGTERM lighttpd
+$busybox killall -3 mysqld
+$busybox killall -SIGTERM mysqld
+$busybox killall -SIGTERM php-cgi
+
+$sbin/nginx/sbin/nginx \
+		-p $assets/conf/nginx -s stop
+## anyway
+$busybox killall -SIGTERM nginx

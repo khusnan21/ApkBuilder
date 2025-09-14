@@ -1,0 +1,10 @@
+#begin_hostname (do not remove this label!)
+	$SERVER["socket"] == "0.0.0.0:%PORT%" {
+#end_hostname (do not remove this label!)
+		#begin_docroot (do not remove this label!)
+			server.document-root = "%LOCATION%"
+		#end_docroot (do not remove this label!)
+		
+		# rewrite engine
+		  url.rewrite-if-not-file = ("(.*)" => "/index.php/$0")
+	}
