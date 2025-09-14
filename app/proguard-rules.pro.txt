@@ -1,21 +1,30 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Jangan obfuscate WebView interface
+-keepclassmembers class com.nkjayanet.app.WebAppInterface {
+    public *;
+}
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Jangan obfuscate Activity utama
+-keep class com.nkjayanet.app.MainActivity {
+    public *;
+}
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Jangan obfuscate semua class di package utama
+-keep class com.nkjayanet.app.** {
+    *;
+}
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Jangan obfuscate asset loader atau file extractor
+-keep class com.nkjayanet.app.util.** {
+    *;
+}
+
+# Simpan informasi line number untuk debugging
+-keepattributes SourceFile,LineNumberTable
+
+# Hindari rename source file name
+-renamesourcefileattribute SourceFile
+
+# Jangan obfuscate native loader (jika ada JNI atau binary runner)
+-keep class com.nkjayanet.app.nativebridge.** {
+    *;
+}
