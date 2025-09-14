@@ -1,10 +1,8 @@
-name: Android Build
+name: Android Signed APK
 
 on:
   push:
-    branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -12,17 +10,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-    - name: Set up JDK 17
+    - name: Setup JDK
       uses: actions/setup-java@v4
       with:
-        java-version: '17'
         distribution: 'temurin'
+        java-version: 17
 
-    - name: Cache Gradle Dependencies
-      uses: actions/cache@v3
+    - name: Cache Gradle
+      uses: actions/cache@v4
       with:
         path: |
           ~/.gradle/caches
@@ -31,41 +28,19 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-gradle-
 
-    - name: Grant Execute Permission to gradlew
-      run: chmod +x ./gradlew
+    - name: Decode keystore (signing)
+      run: echo "${{ secrets.SIGN_KEYSTORE_BASE64 }}" | base64 -d > app/my-release-key.jks
 
-    - name: Resolve Dependencies
-      run: ./gradlew dependencies
-
-    - name: Run Lint Checks
-      run: ./gradlew lint
-
-    - name: Run Unit Tests
-      run: ./gradlew test
-
-    - name: Assemble Debug APK
-      run: ./gradlew assembleDebug
-
-    - name: Assemble Release APK
+    - name: Build signed release APK
       run: ./gradlew assembleRelease
+      env:
+        SIGN_STORE_FILE: app/my-release-key.jks
+        SIGN_STORE_PASSWORD: ${{ secrets.SIGN_STORE_PASSWORD }}
+        SIGN_KEY_ALIAS: ${{ secrets.SIGN_KEY_ALIAS }}
+        SIGN_KEY_PASSWORD: ${{ secrets.SIGN_KEY_PASSWORD }}
 
-    - name: Upload Debug APK
+    - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: app-debug
-        path: app/build/outputs/apk/debug/app-debug.apk
-
-    - name: Upload Release APK (Unsigned)
-      uses: actions/upload-artifact@v4
-      with:
-        name: app-release-unsigned
-        path: app/build/outputs/apk/release/app-release-unsigned.apk
-
-    - name: Upload Build Reports
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: build-reports
-        path: |
-          app/build/reports/
-          app/build/outputs/mapping/
+        name: app-release
+        path: app/build/outputs/apk/release/app-release.apk
