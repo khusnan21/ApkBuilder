@@ -1,30 +1,57 @@
-# Jangan obfuscate WebView interface
--keepclassmembers class com.nkjayanet.app.WebAppInterface {
-    public *;
+plugins {
+    id 'com.android.application'
 }
 
-# Jangan obfuscate Activity utama
--keep class com.nkjayanet.app.MainActivity {
-    public *;
+android {
+    namespace 'com.nkjayanet.app'
+    compileSdk 33
+
+    defaultConfig {
+        applicationId "com.nkjayanet.app"
+        minSdk 21
+        targetSdk 33
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        debug {
+            minifyEnabled false
+            shrinkResources false
+        }
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    buildFeatures {
+        viewBinding true
+    }
+
+    packagingOptions {
+        exclude 'META-INF/LICENSE.txt'
+        exclude 'META-INF/NOTICE.txt'
+    }
 }
 
-# Jangan obfuscate semua class di package utama
--keep class com.nkjayanet.app.** {
-    *;
-}
+dependencies {
+    // Core AndroidX
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.11.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
 
-# Jangan obfuscate asset loader atau file extractor
--keep class com.nkjayanet.app.util.** {
-    *;
-}
+    // WebView asset loader (optional)
+    implementation 'androidx.webkit:webkit:1.9.0'
 
-# Simpan informasi line number untuk debugging
--keepattributes SourceFile,LineNumberTable
+    // Local JARs (for embedded server logic, if any)
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
 
-# Hindari rename source file name
--renamesourcefileattribute SourceFile
-
-# Jangan obfuscate native loader (jika ada JNI atau binary runner)
--keep class com.nkjayanet.app.nativebridge.** {
-    *;
+    // Testing
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
 }
