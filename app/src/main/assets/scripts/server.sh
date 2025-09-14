@@ -1,21 +1,18 @@
 #!/system/bin/sh
 
-# 1. Base dirs
-BASE="$(dirname "$0")/.."
-BIN="$BASE/bin"
-CONF="$BASE/conf/lighttpd.conf"
-WWW="$BASE/www"
-TMP="$BASE/tmp"
+APP_DIR="/data/data/com.nkjayanet.app/files"
+BIN_DIR="$APP_DIR/bin"
+CONF_DIR="$APP_DIR/conf"
+WWW_DIR="$APP_DIR/www"
+SOCKET="$APP_DIR/php.socket"
 
-# 2. Izin dan tmp
-chmod +x "$BIN/"* 2>/dev/null
-mkdir -p "$TMP"
+# Kill existing socket if any
+[ -e "$SOCKET" ] && rm -f "$SOCKET"
 
-# 3. PHP FastCGI ← sesuaikan bin-path php-cgi
-"$BIN/php-cgi" -b 127.0.0.1:9000 \
-    -c "$BASE/conf/php.ini" &
+# Start PHP-CGI as FastCGI backend
+"$BIN_DIR/php-cgi" -b "$SOCKET" &
+echo "[server.sh] php-cgi started on socket $SOCKET"
 
-# 4. Lighttpd
-"$BIN/lighttpd" -f "$CONF" &
-
-exit 0
+# Start Lighttpd with config
+"$BIN_DIR/lighttpd" -f "$CONF_DIR/lighttpd.conf"
+echo "[server.sh] lighttpd started with config $CONF_DIR/lighttpd.conf"
