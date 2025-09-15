@@ -56,21 +56,38 @@ public class MainActivity extends AppCompatActivity {
         copyAssets("conf", new File(getFilesDir(), "conf"));
         copyAssets("scripts", new File(getFilesDir(), "scripts"));
 
+        // Validate important files
+        validateFile("admin.php");
+        validateFile("index.php");
+        validateFile("router.php");
+        validateFile("config.json");
+
         // Start server
         startServerFromConfig();
 
-        // Delay before loading WebView
+        // Load WebView with fallback
+        File adminPhp = new File(getFilesDir(), "htdocs/admin.php");
+        String targetUrl;
+
+        if (adminPhp.exists()) {
+            targetUrl = "http://127.0.0.1:8080/admin.php";
+            appendLog("admin.php found, loading dashboard");
+        } else {
+            targetUrl = "http://127.0.0.1:8080/index.php";
+            appendLog("admin.php not found, fallback to index.php");
+        }
+
         loadingBar.setVisibility(View.VISIBLE);
         new Handler().postDelayed(() -> {
-            webView.loadUrl("http://127.0.0.1:8080/");
-            appendLog("WebView loading: http://127.0.0.1:8080/");
+            webView.loadUrl(targetUrl);
+            appendLog("WebView loading: " + targetUrl);
             loadingBar.setVisibility(View.GONE);
-        }, 4000); // delay 4 detik
+        }, 4000);
     }
 
     private void startServerFromConfig() {
         File modeFile = new File(getFilesDir(), "conf/server_mode.txt");
-        String mode = "php"; // default
+        String mode = "php";
 
         try (BufferedReader reader = new BufferedReader(new FileReader(modeFile))) {
             String line = reader.readLine();
@@ -91,6 +108,11 @@ public class MainActivity extends AppCompatActivity {
     private void startPhpServer() {
         try {
             File php = new File(getFilesDir(), "bin/php");
+            if (!php.exists()) {
+                Toast.makeText(this, "PHP binary not found", Toast.LENGTH_LONG).show();
+                appendLog("PHP binary not found");
+                return;
+            }
             if (!php.setExecutable(true)) {
                 Toast.makeText(this, "PHP binary not executable", Toast.LENGTH_LONG).show();
                 appendLog("PHP binary not executable");
@@ -173,6 +195,15 @@ public class MainActivity extends AppCompatActivity {
             logView.append(msg + "\n");
             logView.post(() -> logView.scrollTo(0, logView.getBottom()));
         });
+    }
+
+    private void validateFile(String name) {
+        File f = new File(getFilesDir(), "htdocs/" + name);
+        if (f.exists()) {
+            appendLog("✔ " + name + " found (" + f.length() + " bytes)");
+        } else {
+            appendLog("✘ " + name + " missing");
+        }
     }
 
     private void copyAssets(String srcDir, File dstDir) {
