@@ -56,31 +56,28 @@ public class MainActivity extends AppCompatActivity {
         copyAssets("conf", new File(getFilesDir(), "conf"));
         copyAssets("scripts", new File(getFilesDir(), "scripts"));
 
-        // Validate important files
-        validateFile("admin.php");
-        validateFile("index.php");
-        validateFile("router.php");
-        validateFile("config.json");
+        // Validate all key files
+        validateFile("htdocs/admin.php");
+        validateFile("htdocs/index.php");
+        validateFile("htdocs/router.php");
+        validateFile("htdocs/config.json");
+        validateFile("bin/php-cgi");
+        validateFile("bin/lighttpd");
+        validateFile("conf/lighttpd.conf");
 
         // Start server
         startServerFromConfig();
 
         // Load WebView with fallback
         File adminPhp = new File(getFilesDir(), "htdocs/admin.php");
-        String targetUrl;
+        String targetUrl = adminPhp.exists()
+            ? "http://127.0.0.1:8080/admin.php"
+            : "http://127.0.0.1:8080/index.php";
 
-        if (adminPhp.exists()) {
-            targetUrl = "http://127.0.0.1:8080/admin.php";
-            appendLog("admin.php found, loading dashboard");
-        } else {
-            targetUrl = "http://127.0.0.1:8080/index.php";
-            appendLog("admin.php not found, fallback to index.php");
-        }
-
+        appendLog("WebView loading: " + targetUrl);
         loadingBar.setVisibility(View.VISIBLE);
         new Handler().postDelayed(() -> {
             webView.loadUrl(targetUrl);
-            appendLog("WebView loading: " + targetUrl);
             loadingBar.setVisibility(View.GONE);
         }, 4000);
     }
@@ -95,45 +92,38 @@ public class MainActivity extends AppCompatActivity {
                 mode = line.trim();
             }
         } catch (IOException e) {
-            appendLog("Config error: server_mode.txt not found, defaulting to PHP");
+            appendLog("server_mode.txt not found, defaulting to PHP");
         }
 
         if (mode.equals("lighttpd")) {
+            startPhpCgi();
             startLighttpd();
         } else {
             startPhpServer();
         }
     }
 
-    private void startPhpServer() {
+    private void startPhpCgi() {
         try {
-            File php = new File(getFilesDir(), "bin/php");
-            if (!php.exists()) {
-                Toast.makeText(this, "PHP binary not found", Toast.LENGTH_LONG).show();
-                appendLog("PHP binary not found");
-                return;
-            }
-            if (!php.setExecutable(true)) {
-                Toast.makeText(this, "PHP binary not executable", Toast.LENGTH_LONG).show();
-                appendLog("PHP binary not executable");
-                return;
-            }
+            File phpCgi = new File(getFilesDir(), "bin/php-cgi");
+            File sock = new File(getFilesDir(), "php-fcgi.sock");
+            if (sock.exists()) sock.delete();
 
-            File htdocs = new File(getFilesDir(), "htdocs");
-            appendLog("Starting PHP server...");
+            if (!phpCgi.setExecutable(true)) {
+                appendLog("php-cgi not executable");
+                return;
+            }
 
             Process p = Runtime.getRuntime().exec(new String[]{
-                php.getAbsolutePath(),
-                "-S", "127.0.0.1:8080",
-                "-t", htdocs.getAbsolutePath()
+                phpCgi.getAbsolutePath(),
+                "-b", sock.getAbsolutePath()
             });
 
             logProcess(p);
+            appendLog("php-cgi started on socket: " + sock.getAbsolutePath());
 
         } catch (IOException e) {
-            Toast.makeText(this, "PHP server failed to start", Toast.LENGTH_LONG).show();
-            appendLog("PHP server failed to start: " + e.getMessage());
-            e.printStackTrace();
+            appendLog("php-cgi failed: " + e.getMessage());
         }
     }
 
@@ -141,13 +131,11 @@ public class MainActivity extends AppCompatActivity {
         try {
             File lighttpd = new File(getFilesDir(), "bin/lighttpd");
             File conf = new File(getFilesDir(), "conf/lighttpd.conf");
+
             if (!lighttpd.setExecutable(true)) {
-                Toast.makeText(this, "Lighttpd binary not executable", Toast.LENGTH_LONG).show();
-                appendLog("Lighttpd binary not executable");
+                appendLog("lighttpd not executable");
                 return;
             }
-
-            appendLog("Starting Lighttpd server...");
 
             Process p = Runtime.getRuntime().exec(new String[]{
                 lighttpd.getAbsolutePath(),
@@ -155,11 +143,37 @@ public class MainActivity extends AppCompatActivity {
             });
 
             logProcess(p);
+            appendLog("lighttpd started with config: " + conf.getAbsolutePath());
 
         } catch (IOException e) {
-            Toast.makeText(this, "Lighttpd failed to start", Toast.LENGTH_LONG).show();
-            appendLog("Lighttpd failed to start: " + e.getMessage());
-            e.printStackTrace();
+            appendLog("lighttpd failed: " + e.getMessage());
+        }
+    }
+
+    private void startPhpServer() {
+        try {
+            File php = new File(getFilesDir(), "bin/php");
+            if (!php.exists()) {
+                appendLog("PHP binary not found");
+                return;
+            }
+            if (!php.setExecutable(true)) {
+                appendLog("PHP binary not executable");
+                return;
+            }
+
+            File htdocs = new File(getFilesDir(), "htdocs");
+            Process p = Runtime.getRuntime().exec(new String[]{
+                php.getAbsolutePath(),
+                "-S", "127.0.0.1:8080",
+                "-t", htdocs.getAbsolutePath()
+            });
+
+            logProcess(p);
+            appendLog("php -S server started");
+
+        } catch (IOException e) {
+            appendLog("php server failed: " + e.getMessage());
         }
     }
 
@@ -174,7 +188,7 @@ public class MainActivity extends AppCompatActivity {
                     appendLog("SERVER-OUT: " + line);
                 }
             } catch (IOException e) {
-                appendLog("Log stdout error: " + e.getMessage());
+                appendLog("stdout error: " + e.getMessage());
             }
         }).start();
 
@@ -185,7 +199,7 @@ public class MainActivity extends AppCompatActivity {
                     appendLog("SERVER-ERR: " + line);
                 }
             } catch (IOException e) {
-                appendLog("Log stderr error: " + e.getMessage());
+                appendLog("stderr error: " + e.getMessage());
             }
         }).start();
     }
@@ -197,12 +211,12 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void validateFile(String name) {
-        File f = new File(getFilesDir(), "htdocs/" + name);
+    private void validateFile(String relativePath) {
+        File f = new File(getFilesDir(), relativePath);
         if (f.exists()) {
-            appendLog("✔ " + name + " found (" + f.length() + " bytes)");
+            appendLog("✔ " + relativePath + " found (" + f.length() + " bytes)");
         } else {
-            appendLog("✘ " + name + " missing");
+            appendLog("✘ " + relativePath + " missing");
         }
     }
 
