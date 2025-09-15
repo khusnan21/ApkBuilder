@@ -20,7 +20,6 @@ public class MainActivity extends AppCompatActivity {
     private ProgressBar loadingBar;
     private WebView webView;
     private final String targetUrl = "http://127.0.0.1:8080/index.php";
-    private final String[] binFiles = {"php-cgi", "lighttpd"};
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,23 +31,20 @@ public class MainActivity extends AppCompatActivity {
 
         appendLog("Copying assets...");
         try {
-            // Copy assets (www, bin, conf)
+            // Copy all needed asset folders
             copyAssets("www", new File(getFilesDir(), "htdocs"));
             copyAssets("bin", new File(getFilesDir(), "bin"));
             copyAssets("conf", new File(getFilesDir(), "conf"));
+            copyAssets("scripts", new File(getFilesDir(), "scripts"));
         } catch (IOException e) {
             appendLog("Failed to copy assets: " + e.getMessage());
             Toast.makeText(this, "Copy asset gagal: " + e.getMessage(), Toast.LENGTH_LONG).show();
             return;
         }
 
-        // Set executable permission for all bin files
-        for (String fname : binFiles) {
-            File f = new File(getFilesDir(), "bin/" + fname);
-            if (f.exists() && !f.setExecutable(true)) {
-                appendLog(fname + " not executable!");
-            }
-        }
+        // Set executable permission for all files in bin/ and scripts/
+        setExecutableRecursive(new File(getFilesDir(), "bin"));
+        setExecutableRecursive(new File(getFilesDir(), "scripts"));
 
         appendLog("Starting php-cgi...");
         startPhpCgi();
@@ -56,7 +52,6 @@ public class MainActivity extends AppCompatActivity {
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             appendLog("Starting lighttpd...");
             startLighttpd();
-            // Setelah lighttpd, tunggu server ready, baru load WebView
             waitServerAndLoadWebView();
         }, 1000);
     }
@@ -68,6 +63,7 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    // Recursively copy all assets
     private void copyAssets(String assetPath, File outDir) throws IOException {
         String[] files = getAssets().list(assetPath);
         if (files == null) return;
@@ -89,6 +85,18 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
             }
+        }
+    }
+
+    // Set all files in dir (recursively) to executable
+    private void setExecutableRecursive(File dir) {
+        if (!dir.exists()) return;
+        if (dir.isDirectory()) {
+            for (File f : dir.listFiles()) setExecutableRecursive(f);
+        } else {
+            dir.setExecutable(true, false);
+            dir.setReadable(true, false);
+            dir.setWritable(true, false);
         }
     }
 
@@ -141,6 +149,7 @@ public class MainActivity extends AppCompatActivity {
         }).start();
     }
 
+    // Wait for lighttpd to listen on 8080 before loading WebView
     private void waitServerAndLoadWebView() {
         new Thread(() -> {
             boolean ready = false;
