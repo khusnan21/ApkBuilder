@@ -249,11 +249,8 @@ public class MainActivity extends AppCompatActivity {
                     out.close();
                 }
             }
-       [43dcd9a7-70db-4a1f-b0ae-981daa162054](https://github.com/yxq5333/MyAndroidSDK-master-master/tree/e15ee7eb24ab28ad72549da38a499abb9e38e728/app%2Fsrc%2Fmain%2Fjava%2Fcom%2Fcrazyhuskar%2Fmyandroidsdk%2Futil%2FMyUtilFile.java?citationMarker=43dcd9a7-70db-4a1f-b0ae-981daa162054 "1")[43dcd9a7-70db-4a1f-b0ae-981daa162054](https://github.com/GladeRom/android_external_chromium_org/tree/f02dfc7cdcc135946d89158d6af5c0fd74f419fc/components%2Fcronet%2Fandroid%2Ftest%2Fsrc%2Forg%2Fchromium%2Fcronet_test_apk%2FCronetTestActivity.java?citationMarker=43dcd9a7-70db-4a1f-b0ae-981daa162054 "2")[43dcd9a7-70db-4a1f-b0ae-981daa162054](https://github.com/towith/SdkBuilder-Android/tree/05db55e0b39682b9efdff5289ee3ca0061781a1d/app%2Fsrc%2Fmain%2Fjava%2Fcom%2Fduy%2Fide%2Ffile%2FFileManager.java?citationMarker=43dcd9a7-70db-4a1f-b0ae-981daa162054 "3")
-        }
-            }
         } catch (IOException e) {
             appendLog("Asset copy error: " + e.getMessage());
         }
     }
-}                                      
+}
