@@ -21,6 +21,9 @@ public class MainActivity extends AppCompatActivity {
     WebView webView;
     ProgressBar loadingBar;
     TextView logView;
+    int retryCount = 0;
+    final int maxRetries = 5;
+    String targetUrl;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -37,9 +40,17 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onReceivedError(WebView view, WebResourceRequest req, WebResourceError err) {
-                Toast.makeText(MainActivity.this, "WebView error: " + err.getDescription(), Toast.LENGTH_LONG).show();
-                appendLog("WebView error: " + err.getDescription());
-                loadingBar.setVisibility(View.GONE);
+                String desc = err.getDescription().toString();
+                appendLog("WebView error: " + desc);
+
+                if (desc.contains("ERR_CONNECTION_REFUSED") && retryCount < maxRetries) {
+                    retryCount++;
+                    appendLog("Retrying WebView... attempt " + retryCount);
+                    new Handler().postDelayed(() -> view.reload(), 2000);
+                } else {
+                    Toast.makeText(MainActivity.this, "WebView error: " + desc, Toast.LENGTH_LONG).show();
+                    loadingBar.setVisibility(View.GONE);
+                }
             }
         });
 
@@ -65,26 +76,31 @@ public class MainActivity extends AppCompatActivity {
         validateFile("bin/lighttpd");
         validateFile("conf/lighttpd.conf");
 
-        // Start server
-        startServerFromConfig();
+        // Inject status.json
+        injectStatusJson();
 
-        // Load WebView with fallback
+        // Determine target URL
         File adminPhp = new File(getFilesDir(), "htdocs/admin.php");
-        String targetUrl = adminPhp.exists()
+        targetUrl = adminPhp.exists()
             ? "http://127.0.0.1:8080/admin.php"
             : "http://127.0.0.1:8080/index.php";
 
-        appendLog("WebView loading: " + targetUrl);
+        appendLog("WebView target: " + targetUrl);
+
+        // Start server
+        startServerFromConfig();
+
+        // Load WebView after delay
         loadingBar.setVisibility(View.VISIBLE);
         new Handler().postDelayed(() -> {
             webView.loadUrl(targetUrl);
-            loadingBar.setVisibility(View.GONE);
+            appendLog("WebView loading: " + targetUrl);
         }, 4000);
     }
 
     private void startServerFromConfig() {
         File modeFile = new File(getFilesDir(), "conf/server_mode.txt");
-        String mode = "php";
+        String mode = "lighttpd";
 
         try (BufferedReader reader = new BufferedReader(new FileReader(modeFile))) {
             String line = reader.readLine();
@@ -92,14 +108,14 @@ public class MainActivity extends AppCompatActivity {
                 mode = line.trim();
             }
         } catch (IOException e) {
-            appendLog("server_mode.txt not found, defaulting to PHP");
+            appendLog("server_mode.txt not found, defaulting to lighttpd");
         }
 
         if (mode.equals("lighttpd")) {
             startPhpCgi();
-            startLighttpd();
+            new Handler().postDelayed(this::startLighttpd, 1000);
         } else {
-            startPhpServer();
+            appendLog("Mode 'php' not supported: binary missing");
         }
     }
 
@@ -150,30 +166,16 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void startPhpServer() {
+    private void injectStatusJson() {
         try {
-            File php = new File(getFilesDir(), "bin/php");
-            if (!php.exists()) {
-                appendLog("PHP binary not found");
-                return;
+            File statusFile = new File(getFilesDir(), "htdocs/status.json");
+            String status = "{ \"php_cgi\": true, \"lighttpd\": true, \"timestamp\": \"" + System.currentTimeMillis() + "\" }";
+            try (FileWriter writer = new FileWriter(statusFile)) {
+                writer.write(status);
             }
-            if (!php.setExecutable(true)) {
-                appendLog("PHP binary not executable");
-                return;
-            }
-
-            File htdocs = new File(getFilesDir(), "htdocs");
-            Process p = Runtime.getRuntime().exec(new String[]{
-                php.getAbsolutePath(),
-                "-S", "127.0.0.1:8080",
-                "-t", htdocs.getAbsolutePath()
-            });
-
-            logProcess(p);
-            appendLog("php -S server started");
-
+            appendLog("✔ status.json injected");
         } catch (IOException e) {
-            appendLog("php server failed: " + e.getMessage());
+            appendLog("✘ status.json injection failed: " + e.getMessage());
         }
     }
 
@@ -247,8 +249,11 @@ public class MainActivity extends AppCompatActivity {
                     out.close();
                 }
             }
+       [43dcd9a7-70db-4a1f-b0ae-981daa162054](https://github.com/yxq5333/MyAndroidSDK-master-master/tree/e15ee7eb24ab28ad72549da38a499abb9e38e728/app%2Fsrc%2Fmain%2Fjava%2Fcom%2Fcrazyhuskar%2Fmyandroidsdk%2Futil%2FMyUtilFile.java?citationMarker=43dcd9a7-70db-4a1f-b0ae-981daa162054 "1")[43dcd9a7-70db-4a1f-b0ae-981daa162054](https://github.com/GladeRom/android_external_chromium_org/tree/f02dfc7cdcc135946d89158d6af5c0fd74f419fc/components%2Fcronet%2Fandroid%2Ftest%2Fsrc%2Forg%2Fchromium%2Fcronet_test_apk%2FCronetTestActivity.java?citationMarker=43dcd9a7-70db-4a1f-b0ae-981daa162054 "2")[43dcd9a7-70db-4a1f-b0ae-981daa162054](https://github.com/towith/SdkBuilder-Android/tree/05db55e0b39682b9efdff5289ee3ca0061781a1d/app%2Fsrc%2Fmain%2Fjava%2Fcom%2Fduy%2Fide%2Ffile%2FFileManager.java?citationMarker=43dcd9a7-70db-4a1f-b0ae-981daa162054 "3")
+        }
+            }
         } catch (IOException e) {
             appendLog("Asset copy error: " + e.getMessage());
         }
     }
-}
+}                                      
