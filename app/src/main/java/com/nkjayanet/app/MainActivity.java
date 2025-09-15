@@ -1,127 +1,118 @@
 package com.nkjayanet.app;
 
+import android.annotation.SuppressLint;
 import android.os.Bundle;
 import android.os.Handler;
-import android.view.View;
+import android.os.Looper;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.webkit.WebResourceRequest;
-import android.webkit.WebResourceError;
-import android.webkit.WebChromeClient;
-import android.webkit.ConsoleMessage;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.util.Log;
 import androidx.appcompat.app.AppCompatActivity;
 import java.io.*;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 
 public class MainActivity extends AppCompatActivity {
 
-    WebView webView;
-    ProgressBar loadingBar;
-    TextView logView;
+    private TextView logView;
+    private ProgressBar loadingBar;
+    private WebView webView;
+    private final String targetUrl = "http://127.0.0.1:8080/index.php";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
-        webView = findViewById(R.id.webView);
-        loadingBar = findViewById(R.id.loadingBar);
         logView = findViewById(R.id.logView);
+        loadingBar = findViewById(R.id.loadingBar);
+        webView = findViewById(R.id.webView);
 
-        webView.getSettings().setJavaScriptEnabled(true);
-        webView.getSettings().setDomStorageEnabled(true);
-
-        webView.setWebViewClient(new WebViewClient() {
-            @Override
-            public void onReceivedError(WebView view, WebResourceRequest req, WebResourceError err) {
-                Toast.makeText(MainActivity.this, "WebView error: " + err.getDescription(), Toast.LENGTH_LONG).show();
-                appendLog("WebView error: " + err.getDescription());
-                loadingBar.setVisibility(View.GONE);
-            }
-        });
-
-        webView.setWebChromeClient(new WebChromeClient() {
-            public boolean onConsoleMessage(ConsoleMessage msg) {
-                appendLog("WebView console: " + msg.message());
-                return true;
-            }
-        });
-
-        // Copy all assets
-        copyAssets("www", new File(getFilesDir(), "htdocs"));
-        copyAssets("bin", new File(getFilesDir(), "bin"));
-        copyAssets("conf", new File(getFilesDir(), "conf"));
-        copyAssets("scripts", new File(getFilesDir(), "scripts"));
-
-        // Validate all key files
-        validateFile("htdocs/admin.php");
-        validateFile("htdocs/index.php");
-        validateFile("htdocs/router.php");
-        validateFile("htdocs/config.json");
-        validateFile("bin/php-cgi");
-        validateFile("bin/lighttpd");
-        validateFile("conf/lighttpd.conf");
-
-        // Start server
-        startServerFromConfig();
-
-        // Load WebView with fallback
-        File adminPhp = new File(getFilesDir(), "htdocs/admin.php");
-        String targetUrl = adminPhp.exists()
-            ? "http://127.0.0.1:8080/admin.php"
-            : "http://127.0.0.1:8080/index.php";
-
-        appendLog("WebView loading: " + targetUrl);
-        loadingBar.setVisibility(View.VISIBLE);
-        new Handler().postDelayed(() -> {
-            webView.loadUrl(targetUrl);
-            loadingBar.setVisibility(View.GONE);
-        }, 4000);
-    }
-
-    private void startServerFromConfig() {
-        File modeFile = new File(getFilesDir(), "conf/server_mode.txt");
-        String mode = "php";
-
-        try (BufferedReader reader = new BufferedReader(new FileReader(modeFile))) {
-            String line = reader.readLine();
-            if (line != null && (line.equalsIgnoreCase("lighttpd") || line.equalsIgnoreCase("php"))) {
-                mode = line.trim();
-            }
+        appendLog("Copying assets...");
+        try {
+            // Copy all needed asset folders
+            copyAssets("www", new File(getFilesDir(), "htdocs"));
+            copyAssets("bin", new File(getFilesDir(), "bin"));
+            copyAssets("conf", new File(getFilesDir(), "conf"));
+            copyAssets("scripts", new File(getFilesDir(), "scripts"));
         } catch (IOException e) {
-            appendLog("server_mode.txt not found, defaulting to PHP");
+            appendLog("Failed to copy assets: " + e.getMessage());
+            Toast.makeText(this, "Copy asset gagal: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            return;
         }
 
-        if (mode.equals("lighttpd")) {
-            startPhpCgi();
+        // Set executable permission for all files in bin/ and scripts/
+        setExecutableRecursive(new File(getFilesDir(), "bin"));
+        setExecutableRecursive(new File(getFilesDir(), "scripts"));
+
+        appendLog("Starting php-cgi...");
+        startPhpCgi();
+
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            appendLog("Starting lighttpd...");
             startLighttpd();
+            waitServerAndLoadWebView();
+        }, 1000);
+    }
+
+    private void appendLog(String msg) {
+        runOnUiThread(() -> {
+            logView.append(msg + "\n");
+            android.util.Log.d("ApkBuilder", msg);
+        });
+    }
+
+    // Recursively copy all assets
+    private void copyAssets(String assetPath, File outDir) throws IOException {
+        String[] files = getAssets().list(assetPath);
+        if (files == null) return;
+        if (!outDir.exists()) outDir.mkdirs();
+
+        for (String filename : files) {
+            String inPath = assetPath + "/" + filename;
+            File outFile = new File(outDir, filename);
+            String[] subfiles = getAssets().list(inPath);
+            if (subfiles != null && subfiles.length > 0) {
+                copyAssets(inPath, outFile);
+            } else {
+                try (InputStream in = getAssets().open(inPath);
+                     OutputStream out = new FileOutputStream(outFile)) {
+                    byte[] buf = new byte[4096];
+                    int len;
+                    while ((len = in.read(buf)) > 0) {
+                        out.write(buf, 0, len);
+                    }
+                }
+            }
+        }
+    }
+
+    // Set all files in dir (recursively) to executable
+    private void setExecutableRecursive(File dir) {
+        if (!dir.exists()) return;
+        if (dir.isDirectory()) {
+            for (File f : dir.listFiles()) setExecutableRecursive(f);
         } else {
-            startPhpServer();
+            dir.setExecutable(true, false);
+            dir.setReadable(true, false);
+            dir.setWritable(true, false);
         }
     }
 
     private void startPhpCgi() {
         try {
-            File phpCgi = new File(getFilesDir(), "bin/php-cgi");
-            File sock = new File(getFilesDir(), "php-fcgi.sock");
-            if (sock.exists()) sock.delete();
-
-            if (!phpCgi.setExecutable(true)) {
-                appendLog("php-cgi not executable");
+            File php = new File(getFilesDir(), "bin/php-cgi");
+            if (!php.exists()) {
+                appendLog("php-cgi not found!");
                 return;
             }
-
-            Process p = Runtime.getRuntime().exec(new String[]{
-                phpCgi.getAbsolutePath(),
-                "-b", sock.getAbsolutePath()
-            });
-
-            logProcess(p);
-            appendLog("php-cgi started on socket: " + sock.getAbsolutePath());
-
+            Process phpProc = Runtime.getRuntime().exec(new String[]{
+                php.getAbsolutePath(),
+                "-b", "127.0.0.1:9000"
+            }, null, getFilesDir());
+            logProcess(phpProc, "php-cgi");
+            appendLog("php-cgi started.");
         } catch (IOException e) {
             appendLog("php-cgi failed: " + e.getMessage());
         }
@@ -131,124 +122,70 @@ public class MainActivity extends AppCompatActivity {
         try {
             File lighttpd = new File(getFilesDir(), "bin/lighttpd");
             File conf = new File(getFilesDir(), "conf/lighttpd.conf");
-
-            if (!lighttpd.setExecutable(true)) {
-                appendLog("lighttpd not executable");
+            if (!lighttpd.exists() || !conf.exists()) {
+                appendLog("lighttpd/conf file not found!");
                 return;
             }
-
             Process p = Runtime.getRuntime().exec(new String[]{
                 lighttpd.getAbsolutePath(),
                 "-f", conf.getAbsolutePath()
-            });
-
-            logProcess(p);
-            appendLog("lighttpd started with config: " + conf.getAbsolutePath());
-
+            }, null, getFilesDir());
+            logProcess(p, "lighttpd");
+            appendLog("lighttpd started.");
         } catch (IOException e) {
             appendLog("lighttpd failed: " + e.getMessage());
         }
     }
 
-    private void startPhpServer() {
-        try {
-            File php = new File(getFilesDir(), "bin/php");
-            if (!php.exists()) {
-                appendLog("PHP binary not found");
-                return;
-            }
-            if (!php.setExecutable(true)) {
-                appendLog("PHP binary not executable");
-                return;
-            }
+    private void logProcess(Process p, String name) {
+        new Thread(() -> {
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(p.getErrorStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    appendLog(name + ": " + line);
+                }
+            } catch (IOException ignored) {}
+        }).start();
+    }
 
-            File htdocs = new File(getFilesDir(), "htdocs");
-            Process p = Runtime.getRuntime().exec(new String[]{
-                php.getAbsolutePath(),
-                "-S", "127.0.0.1:8080",
-                "-t", htdocs.getAbsolutePath()
+    // Wait for lighttpd to listen on 8080 before loading WebView
+    private void waitServerAndLoadWebView() {
+        new Thread(() -> {
+            boolean ready = false;
+            for (int i = 0; i < 12; i++) { // max 12 detik
+                try (Socket s = new Socket()) {
+                    s.connect(new InetSocketAddress("127.0.0.1", 8080), 700);
+                    ready = true;
+                    break;
+                } catch (IOException e) {
+                    try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
+                }
+            }
+            boolean serverReady = ready;
+            runOnUiThread(() -> {
+                loadingBar.setVisibility(android.view.View.GONE);
+                if (serverReady) {
+                    setupWebView();
+                    webView.loadUrl(targetUrl);
+                    appendLog("WebView loading: " + targetUrl);
+                } else {
+                    appendLog("Server not ready after timeout");
+                    Toast.makeText(this, "Server gagal running.", Toast.LENGTH_LONG).show();
+                }
             });
-
-            logProcess(p);
-            appendLog("php -S server started");
-
-        } catch (IOException e) {
-            appendLog("php server failed: " + e.getMessage());
-        }
-    }
-
-    private void logProcess(Process p) {
-        BufferedReader stdout = new BufferedReader(new InputStreamReader(p.getInputStream()));
-        BufferedReader stderr = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-
-        new Thread(() -> {
-            try {
-                String line;
-                while ((line = stdout.readLine()) != null) {
-                    appendLog("SERVER-OUT: " + line);
-                }
-            } catch (IOException e) {
-                appendLog("stdout error: " + e.getMessage());
-            }
-        }).start();
-
-        new Thread(() -> {
-            try {
-                String line;
-                while ((line = stderr.readLine()) != null) {
-                    appendLog("SERVER-ERR: " + line);
-                }
-            } catch (IOException e) {
-                appendLog("stderr error: " + e.getMessage());
-            }
         }).start();
     }
 
-    private void appendLog(String msg) {
-        runOnUiThread(() -> {
-            logView.append(msg + "\n");
-            logView.post(() -> logView.scrollTo(0, logView.getBottom()));
+    @SuppressLint("SetJavaScriptEnabled")
+    private void setupWebView() {
+        webView.getSettings().setJavaScriptEnabled(true);
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
+                appendLog("WebView error: " + description);
+                Toast.makeText(MainActivity.this, "WebView error: " + description, Toast.LENGTH_SHORT).show();
+            }
         });
     }
-
-    private void validateFile(String relativePath) {
-        File f = new File(getFilesDir(), relativePath);
-        if (f.exists()) {
-            appendLog("✔ " + relativePath + " found (" + f.length() + " bytes)");
-        } else {
-            appendLog("✘ " + relativePath + " missing");
-        }
-    }
-
-    private void copyAssets(String srcDir, File dstDir) {
-        try {
-            String[] assets = getAssets().list(srcDir);
-            if (assets == null || assets.length == 0) return;
-
-            if (!dstDir.exists()) dstDir.mkdirs();
-
-            for (String name : assets) {
-                String fullPath = srcDir + "/" + name;
-                String[] subAssets = getAssets().list(fullPath);
-                File outFile = new File(dstDir, name);
-
-                if (subAssets != null && subAssets.length > 0) {
-                    copyAssets(fullPath, outFile); // recursive
-                } else {
-                    InputStream in = getAssets().open(fullPath);
-                    OutputStream out = new FileOutputStream(outFile);
-                    byte[] buffer = new byte[1024];
-                    int read;
-                    while ((read = in.read(buffer)) != -1) {
-                        out.write(buffer, 0, read);
-                    }
-                    in.close();
-                    out.flush();
-                    out.close();
-                }
-            }
-        } catch (IOException e) {
-            appendLog("Asset copy error: " + e.getMessage());
-        }
-    }
-            }
+                 }
