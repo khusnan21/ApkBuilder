@@ -1,1 +1,1 @@
-lighttpd
+php
